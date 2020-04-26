@@ -129,6 +129,7 @@ public abstract class FailbackRegistry extends AbstractRegistry {
 
     @Override
     public void register(URL url) {
+        System.out.println("-----------执行FailbackRegistry # register()方法");
         super.register(url);
         failedRegistered.remove(url);
         failedUnregistered.remove(url);
@@ -189,6 +190,7 @@ public abstract class FailbackRegistry extends AbstractRegistry {
 
     @Override
     public void subscribe(URL url, NotifyListener listener) {
+        logger.info("---执行subscribe.....");
         super.subscribe(url, listener);
         removeFailedSubscribed(url, listener);
         try {

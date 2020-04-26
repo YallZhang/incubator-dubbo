@@ -107,10 +107,9 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
+        System.out.println("监听到ApplicationContext refresh完毕事件!");
         if (isDelay() && !isExported() && !isUnexported()) {
-            if (logger.isInfoEnabled()) {
-                logger.info("The service ready on spring started. service: " + getInterface());
-            }
+            logger.info("The service ready on spring started. service: " + getInterface());
             export();
         }
     }

@@ -111,7 +111,9 @@ public class ZookeeperRegistry extends FailbackRegistry {
     @Override
     protected void doRegister(URL url) {
         try {
+            System.out.println("------------ZooKeeperRegistry doRegister()开始创建ZK节点");
             zkClient.create(toUrlPath(url), url.getParameter(Constants.DYNAMIC_KEY, true));
+            System.out.println("-----------ZooKeeperRegistry doRegister() -创建ZK节点结束");
         } catch (Throwable e) {
             throw new RpcException("Failed to register " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
         }
@@ -129,6 +131,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
     @Override
     protected void doSubscribe(final URL url, final NotifyListener listener) {
         try {
+            logger.info("doSubscribe().........");
             if (Constants.ANY_VALUE.equals(url.getServiceInterface())) {
                 String root = toRootPath();
                 ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);

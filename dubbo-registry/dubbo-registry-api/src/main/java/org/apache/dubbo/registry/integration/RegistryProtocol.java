@@ -55,7 +55,6 @@ import static org.apache.dubbo.common.Constants.VALIDATION_KEY;
 
 /**
  * RegistryProtocol
- *
  */
 public class RegistryProtocol implements Protocol {
 
@@ -127,8 +126,16 @@ public class RegistryProtocol implements Protocol {
         registry.register(registedProviderUrl);
     }
 
+    /**
+     * 将URL注册到注册中心，每个Invoker里面都可以获取到URL
+     * @param originInvoker
+     * @param <T>
+     * @return
+     * @throws RpcException
+     */
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
+        System.out.println("-----------RegistryProtocol 执行export(invoker)方法...");
         //export invoker
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker);
 
@@ -155,6 +162,7 @@ public class RegistryProtocol implements Protocol {
         overrideListeners.put(overrideSubscribeUrl, overrideSubscribeListener);
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
         //Ensure that a new exporter instance is returned every time export
+        System.out.println("-----------RegistryProtocol 执行export(invoker)方法 结束");
         return new DestroyableExporter<T>(exporter, originInvoker, overrideSubscribeUrl, registeredProviderUrl);
     }
 
@@ -271,8 +279,15 @@ public class RegistryProtocol implements Protocol {
     @Override
     @SuppressWarnings("unchecked")
     public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
+        logger.info("=======开始执行RegistryProtocol的refer()方法，最后需要返回Invoker...");
+        logger.info("type:" + type);
+        logger.info("url: " + url);
         url = url.setProtocol(url.getParameter(Constants.REGISTRY_KEY, Constants.DEFAULT_REGISTRY)).removeParameter(Constants.REGISTRY_KEY);
+
+        logger.info("通过SPI机制获取具体的注册中心实例");
         Registry registry = registryFactory.getRegistry(url);
+
+
         if (RegistryService.class.equals(type)) {
             return proxyFactory.getInvoker((T) registry, type, url);
         }
@@ -286,7 +301,9 @@ public class RegistryProtocol implements Protocol {
                 return doRefer(getMergeableCluster(), registry, type, url);
             }
         }
-        return doRefer(cluster, registry, type, url);
+        Invoker<T> invoker = doRefer(cluster, registry, type, url);
+        logger.info("======结束 执行RegistryProtocol的refer()方法...");
+        return invoker;
     }
 
     private Cluster getMergeableCluster() {
@@ -300,17 +317,37 @@ public class RegistryProtocol implements Protocol {
         // all attributes of REFER_KEY
         Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
         URL subscribeUrl = new URL(Constants.CONSUMER_PROTOCOL, parameters.remove(Constants.REGISTER_IP_KEY), 0, type.getName(), parameters);
+        logger.info("doRefer()内生成服务消费者URL: " + subscribeUrl);
+
         if (!Constants.ANY_VALUE.equals(url.getServiceInterface())
                 && url.getParameter(Constants.REGISTER_KEY, true)) {
-            registry.register(subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY,
-                    Constants.CHECK_KEY, String.valueOf(false)));
-        }
-        directory.subscribe(subscribeUrl.addParameter(Constants.CATEGORY_KEY,
-                Constants.PROVIDERS_CATEGORY
-                        + "," + Constants.CONFIGURATORS_CATEGORY
-                        + "," + Constants.ROUTERS_CATEGORY));
 
+            URL rURL = subscribeUrl.addParameters(Constants.CATEGORY_KEY, Constants.CONSUMERS_CATEGORY,
+                    Constants.CHECK_KEY, String.valueOf(false));
+
+            System.out.println();
+            logger.info("将服务消费者URL包装成ZKNode，注册到zk的consumers目录下");
+            registry.register(rURL);
+            logger.info("结束将服务消费者URL包装成ZKNode，注册到zk的consumers目录下 结束");
+
+        }
+
+        System.out.println();
+        URL toSubscribeUrl = subscribeUrl.addParameter(
+                Constants.CATEGORY_KEY,
+                Constants.PROVIDERS_CATEGORY + "," + Constants.CONFIGURATORS_CATEGORY + "," + Constants.ROUTERS_CATEGORY);
+        logger.info("当前consumer节点订阅 zk中providers、configurators、routers节点的变化");
+        logger.info("过程是先读取回节点信息，再订阅");
+        directory.subscribe(toSubscribeUrl);
+        logger.info("结束 当前consumer节点订阅 zk中providers、configurators、routers节点的变化 结束");
+
+        System.out.println();
+        //而将多个服务如何包装成一个服务？dubbo中有一层目录结构，directory，将多个invoker组装成一个FailoverClusterInvoker服务，实质就是一个invoker服务。
+        logger.info("cluster.join(directory) : 返回zk节点信息后，可以看到一个注册中心可能有多个服务提供者，因此这里需要将多个服务提供者合并为一个");
         Invoker invoker = cluster.join(directory);
+        logger.info("结束 cluster.join(directory) : 合并多个服务提供者为一个总的Invoker结束");
+        System.out.println();
+
         ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
         return invoker;
     }
@@ -366,9 +403,9 @@ public class RegistryProtocol implements Protocol {
          */
         @Override
         public synchronized void notify(List<URL> urls) {
-            logger.debug("original override urls: " + urls);
+            logger.info("original override urls: " + urls);
             List<URL> matchedUrls = getMatchedUrls(urls, subscribeUrl);
-            logger.debug("subscribe url: " + subscribeUrl + ", override urls: " + matchedUrls);
+            logger.info("subscribe url: " + subscribeUrl + ", override urls: " + matchedUrls);
             // No matching results
             if (matchedUrls.isEmpty()) {
                 return;

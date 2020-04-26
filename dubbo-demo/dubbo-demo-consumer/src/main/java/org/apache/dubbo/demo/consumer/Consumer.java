@@ -16,28 +16,32 @@
  */
 package org.apache.dubbo.demo.consumer;
 
-import org.apache.dubbo.demo.DemoService;
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.demo.ZynService;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 public class Consumer {
+    protected static final Logger logger = LoggerFactory.getLogger(Consumer.class);
 
-    /**
-     * To get ipv6 address to work, add
-     * System.setProperty("java.net.preferIPv6Addresses", "true");
-     * before running your application.
-     */
     public static void main(String[] args) {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(new String[]{"META-INF/spring/dubbo-demo-consumer.xml"});
         context.start();
-        DemoService demoService = (DemoService) context.getBean("demoService"); // get remote service proxy
-        while (true) {
-            try {
-                Thread.sleep(1000);
-                String hello = demoService.sayHello("world"); // call remote method
-                System.out.println(hello); // get result
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
-            }
+        System.out.println("===============consumer端的spring容器加载完毕");
+        System.out.println();
+        System.out.println("===============开始context.getBean()的方式进行服务引用 :获取远程服务Invoker的代理");
+        ZynService zynService = (ZynService) context.getBean("zynService");
+        System.out.println("===============服务引用结束。 zynService代理对象的类型:" + zynService.getClass().getSimpleName());
+        System.out.println();
+
+//        while (true) {
+        try {
+            Thread.sleep(1000);
+            String food = zynService.makeMeiShi("青虾");
+            System.out.println(food);
+        } catch (Throwable throwable) {
+            throwable.printStackTrace();
         }
+//        }
     }
 }

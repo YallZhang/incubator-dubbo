@@ -16,6 +16,8 @@
  */
 package org.apache.dubbo.rpc.cluster.support;
 
+import org.apache.dubbo.common.logger.Logger;
+import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.rpc.Invocation;
 import org.apache.dubbo.rpc.Invoker;
 import org.apache.dubbo.rpc.Result;
@@ -31,12 +33,13 @@ import java.util.List;
  *
  */
 public class AvailableCluster implements Cluster {
+    private final static Logger logger = LoggerFactory.getLogger(AvailableCluster.class);
 
     public static final String NAME = "available";
 
     @Override
     public <T> Invoker<T> join(Directory<T> directory) throws RpcException {
-
+        logger.info("+++++++++++++++执行AvailableCluster的join()方法，并返回Invoker");
         return new AbstractClusterInvoker<T>(directory) {
             @Override
             public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {

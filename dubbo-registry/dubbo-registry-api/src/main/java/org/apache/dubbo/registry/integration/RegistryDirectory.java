@@ -183,6 +183,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     @Override
     public synchronized void notify(List<URL> urls) {
+        //logger.info("开始执行RegistryDirectoryListener的notify方法...");
         List<URL> invokerUrls = new ArrayList<URL>();
         List<URL> routerUrls = new ArrayList<URL>();
         List<URL> configuratorUrls = new ArrayList<URL>();
@@ -221,7 +222,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             }
         }
         // providers
-        refreshInvoker(invokerUrls);
+        if (invokerUrls != null) {
+            logger.info("对providers执行refreshInvoker()");
+            refreshInvoker(invokerUrls);
+            logger.info("对providers执行refreshInvoker()结束");
+        } else {
+            refreshInvoker(invokerUrls);
+        }
+
     }
 
     /**
@@ -232,7 +240,6 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      *
      * @param invokerUrls this parameter can't be null
      */
-    // TODO: 2017/8/31 FIXME The thread pool should be used to refresh the address, otherwise the task may be accumulated.
     private void refreshInvoker(List<URL> invokerUrls) {
         if (invokerUrls != null && invokerUrls.size() == 1 && invokerUrls.get(0) != null
                 && Constants.EMPTY_PROTOCOL.equals(invokerUrls.get(0).getProtocol())) {
@@ -338,7 +345,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * @return invokers
      */
     private Map<String, Invoker<T>> toInvokers(List<URL> urls) {
-        Map<String, Invoker<T>> newUrlInvokerMap = new HashMap<String, Invoker<T>>();
+        Map<String, Invoker<T>> newUrlInvokerMap = new HashMap<>();
         if (urls == null || urls.isEmpty()) {
             return newUrlInvokerMap;
         }

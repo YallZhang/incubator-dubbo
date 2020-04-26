@@ -40,7 +40,6 @@ public abstract class AbstractProtocol implements Protocol {
 
     protected final Map<String, Exporter<?>> exporterMap = new ConcurrentHashMap<String, Exporter<?>>();
 
-    //TODO SOFEREFENCE
     protected final Set<Invoker<?>> invokers = new ConcurrentHashSet<Invoker<?>>();
 
     protected static String serviceKey(URL url) {
@@ -55,20 +54,20 @@ public abstract class AbstractProtocol implements Protocol {
 
     @Override
     public void destroy() {
+        //1.关闭Invoker
         for (Invoker<?> invoker : invokers) {
             if (invoker != null) {
                 invokers.remove(invoker);
                 try {
-                    if (logger.isInfoEnabled()) {
-                        logger.info("Destroy reference: " + invoker.getUrl());
-                    }
+                    logger.info("Destroy reference: " + invoker.getUrl());
                     invoker.destroy();
                 } catch (Throwable t) {
                     logger.warn(t.getMessage(), t);
                 }
             }
         }
-        for (String key : new ArrayList<String>(exporterMap.keySet())) {
+
+        for (String key : new ArrayList<>(exporterMap.keySet())) {
             Exporter<?> exporter = exporterMap.remove(key);
             if (exporter != null) {
                 try {

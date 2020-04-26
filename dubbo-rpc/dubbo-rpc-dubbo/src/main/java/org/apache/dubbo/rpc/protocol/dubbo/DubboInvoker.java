@@ -66,8 +66,15 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
         this.invokers = invokers;
     }
 
+    /**
+     * Dubbo 对同步和异步调用的处理逻辑
+     * @param invocation
+     * @return
+     * @throws Throwable
+     */
     @Override
     protected Result doInvoke(final Invocation invocation) throws Throwable {
+        logger.info("开始执行DubboInvoker的invoke()方法");
         RpcInvocation inv = (RpcInvocation) invocation;
         final String methodName = RpcUtils.getMethodName(invocation);
         inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());
@@ -85,14 +92,22 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
             boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
             int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
             if (isOneway) {
+                // 异步无返回值调用
                 boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
+                // 发送请求
                 currentClient.send(inv, isSent);
+                // 设置上下文中的 future 字段为 null
                 RpcContext.getContext().setFuture(null);
+                // 直接返回一个空的 RpcResult
                 return new RpcResult();
-            } else if (isAsync) {
+            }
+            // 异步有返回值
+            else if (isAsync) {
+                // 发送请求，并得到一个 ResponseFuture 实例
                 ResponseFuture future = currentClient.request(inv, timeout);
                 // For compatibility
                 FutureAdapter<Object> futureAdapter = new FutureAdapter<>(future);
+                // 设置 future 到上下文中
                 RpcContext.getContext().setFuture(futureAdapter);
 
                 Result result;
@@ -104,13 +119,17 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
                 }
                 return result;
             } else {
+                // 同步调用
                 RpcContext.getContext().setFuture(null);
+                // 发送请求，得到一个 ResponseFuture 实例，并调用该实例的 get 方法进行等待
                 return (Result) currentClient.request(inv, timeout).get();
             }
         } catch (TimeoutException e) {
             throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "Invoke remote method timeout. method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
         } catch (RemotingException e) {
             throw new RpcException(RpcException.NETWORK_EXCEPTION, "Failed to invoke remote method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+        } finally {
+            logger.info("DubboInvoker的invoke()方法 执行结束");
         }
     }
 

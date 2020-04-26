@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AbstractClusterInvoker
+ * consumer端进行调用的入口
  */
 public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
 
@@ -138,10 +139,12 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
     }
 
     private Invoker<T> doSelect(LoadBalance loadbalance, Invocation invocation, List<Invoker<T>> invokers, List<Invoker<T>> selected) throws RpcException {
-        if (invokers == null || invokers.isEmpty())
+        if (invokers == null || invokers.isEmpty()) {
             return null;
-        if (invokers.size() == 1)
+        }
+        if (invokers.size() == 1) {
             return invokers.get(0);
+        }
         Invoker<T> invoker = loadbalance.select(invokers, getUrl(), invocation);
 
         //If the `invoker` is in the  `selected` or invoker is unavailable && availablecheck is true, reselect.
@@ -224,6 +227,16 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         return null;
     }
 
+    /**
+     * 列举 Invoker，负载均衡等操作均会在此阶段被执行
+     * 第二个阶段是在服务消费者进行远程调用时。
+     * 以 FailoverClusterInvoker 为例，该类型 Cluster Invoker 首先会调用 Directory 的 list 方法列举 Invoker 列表（可将 Invoker 简单理解为服务提供者）。
+     * Directory 的用途是保存 Invoker，可简单类比为 List<Invoker>。
+     * 其实现类 RegistryDirectory 是一个动态服务目录，可感知注册中心配置的变化，它所持有的 Invoker 列表会随着注册中心内容的变化而变化。
+     * 每次变化后，RegistryDirectory 会动态增删 Invoker，并调用 Router 的 route 方法进行路由，过滤掉不符合路由规则的 Invoker。
+     * 当 FailoverClusterInvoker 拿到 Directory 返回的 Invoker 列表后，它会通过 LoadBalance 从 Invoker 列表中选择一个 Invoker。
+     * 最后 FailoverClusterInvoker 会将参数传给 LoadBalance 选择出的 Invoker 实例的 invoke 方法，进行真正的远程调用。
+     */
     @Override
     public Result invoke(final Invocation invocation) throws RpcException {
         checkWhetherDestroyed();
@@ -233,11 +246,20 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         if (contextAttachments != null && contextAttachments.size() != 0) {
             ((RpcInvocation) invocation).addAttachments(contextAttachments);
         }
-
+        System.out.println();
+        logger.info("列举Invoker.............");
         List<Invoker<T>> invokers = list(invocation);
+        logger.info("列举Invoker............. 结束");
+        System.out.println();
+        logger.info("SPI加载负载均衡策略");
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
+        logger.info("SPI加载负载均衡策略 结束");
+        System.out.println();
+
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
-        return doInvoke(invocation, invokers, loadbalance);
+        Result result = doInvoke(invocation, invokers, loadbalance);
+
+        return result;
     }
 
     protected void checkWhetherDestroyed() {
@@ -286,8 +308,9 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
      */
     protected LoadBalance initLoadBalance(List<Invoker<T>> invokers, Invocation invocation) {
         if (CollectionUtils.isNotEmpty(invokers)) {
-            return ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(invokers.get(0).getUrl()
-                    .getMethodParameter(RpcUtils.getMethodName(invocation), Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));
+            return ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(
+                    invokers.get(0).getUrl()
+                            .getMethodParameter(RpcUtils.getMethodName(invocation), Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));
         } else {
             return ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(Constants.DEFAULT_LOADBALANCE);
         }

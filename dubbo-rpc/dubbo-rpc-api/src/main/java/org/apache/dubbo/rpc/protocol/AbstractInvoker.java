@@ -124,6 +124,7 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
 
     @Override
     public Result invoke(Invocation inv) throws RpcException {
+        logger.info("开始执行AbstractInvoker的invoke()方法");
         if (destroyed.get()) {
             throw new RpcException("Rpc invoker for service " + this + " on consumer " + NetUtils.getLocalHost()
                     + " use dubbo version " + Version.getVersion()
@@ -170,6 +171,8 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
             }
         } catch (Throwable e) {
             return new RpcResult(e);
+        }finally {
+            logger.info("AbstractInvoker的invoke()方法执行结束");
         }
     }
 

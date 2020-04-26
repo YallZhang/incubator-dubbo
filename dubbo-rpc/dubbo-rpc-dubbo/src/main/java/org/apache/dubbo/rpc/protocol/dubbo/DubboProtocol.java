@@ -252,7 +252,7 @@ public class DubboProtocol extends AbstractProtocol {
         //export an stub service for dispatching event
         Boolean isStubSupportEvent = url.getParameter(Constants.STUB_EVENT_KEY, Constants.DEFAULT_STUB_EVENT);
         Boolean isCallbackservice = url.getParameter(Constants.IS_CALLBACK_SERVICE, false);
-        if (isStubSupportEvent && !isCallbackservice) {
+        if (isStubSupportEvent && false == isCallbackservice) {
             String stubServiceMethods = url.getParameter(Constants.STUB_EVENT_METHODS_KEY);
             if (stubServiceMethods == null || stubServiceMethods.length() == 0) {
                 if (logger.isWarnEnabled()) {
@@ -263,8 +263,10 @@ public class DubboProtocol extends AbstractProtocol {
                 stubServiceMethodsMap.put(url.getServiceKey(), stubServiceMethods);
             }
         }
-
+        System.out.println("-----------DubboProtocol 在export()内 执行openServer()");
         openServer(url);
+        System.out.println("-----------DubboProtocol 在export()内 执行openServer()结束");
+
         optimizeSerialization(url);
         return exporter;
     }
@@ -353,10 +355,24 @@ public class DubboProtocol extends AbstractProtocol {
 
     @Override
     public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
+        System.out.println();
+        logger.info("【开始执行DubboProtocol的refer()...】");
         optimizeSerialization(url);
-        // create rpc invoker.
-        DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
+        //getClients方法用于获取客户端实例，实例类型为 ExchangeClient。
+        // ExchangeClient 实际上并不具备通信能力，它需要基于更底层的客户端实例进行通信。
+        // 比如 NettyClient、MinaClient 等，默认情况下，Dubbo 使用 NettyClient 进行通信。
+        logger.info("-------getClients方法用于获取客户端实例");
+        ExchangeClient[] exchangeClients = getClients(url);
+        logger.info("-------结束-----getClients方法用于获取客户端实例");
+        System.out.println();
+        System.out.println();
+        logger.info("refer()内创建DubboInvoker开始");
+        DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, exchangeClients, invokers);
+        logger.info("refer()内创建DubboInvoker结束");
         invokers.add(invoker);
+        logger.info("【----执行DubboProtocol的refer()结束！】");
+        System.out.println();
+
         return invoker;
     }
 
@@ -445,7 +461,9 @@ public class DubboProtocol extends AbstractProtocol {
 
     @Override
     public void destroy() {
-        for (String key : new ArrayList<String>(serverMap.keySet())) {
+        //1. 关闭server
+        //因为服务端是通过DubboProtocol的openServer通过Netty开启服务的,serverMap.put(key, createServer(url))。当关闭的时候肯定需要要服务进行关闭,释放端口和系统资源。
+        for (String key : new ArrayList<>(serverMap.keySet())) {
             ExchangeServer server = serverMap.remove(key);
             if (server != null) {
                 try {
@@ -459,7 +477,9 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
-        for (String key : new ArrayList<String>(referenceClientMap.keySet())) {
+
+        //2. 关闭Reference Client
+        for (String key : new ArrayList<>(referenceClientMap.keySet())) {
             ExchangeClient client = referenceClientMap.remove(key);
             if (client != null) {
                 try {
@@ -473,20 +493,22 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
-        for (String key : new ArrayList<String>(ghostClientMap.keySet())) {
+        //关闭ghost client(官方注释叫幽灵client)
+        //这个操作只为了防止程序bug错误关闭client做的防御措施
+        for (String key : new ArrayList<>(ghostClientMap.keySet())) {
             ExchangeClient client = ghostClientMap.remove(key);
             if (client != null) {
                 try {
-                    if (logger.isInfoEnabled()) {
-                        logger.info("Close dubbo connect: " + client.getLocalAddress() + "-->" + client.getRemoteAddress());
-                    }
+                    logger.info("Close dubbo connect: " + client.getLocalAddress() + "-->" + client.getRemoteAddress());
                     client.close(ConfigUtils.getServerShutdownTimeout());
                 } catch (Throwable t) {
                     logger.warn(t.getMessage(), t);
                 }
             }
         }
+        //清空stubServiceMethodsMap
         stubServiceMethodsMap.clear();
+        //关闭Invoker,将服务设置成不可用。然后通过Exporter.unexport()关闭导出的服务
         super.destroy();
     }
 }

@@ -41,18 +41,14 @@ import org.apache.dubbo.rpc.cluster.support.ClusterUtils;
 import org.apache.dubbo.rpc.protocol.injvm.InjvmProtocol;
 import org.apache.dubbo.rpc.service.GenericService;
 import org.apache.dubbo.rpc.support.ProtocolUtils;
+import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import static org.apache.dubbo.common.utils.NetUtils.isInvalidLocalHost;
 
@@ -60,6 +56,7 @@ import static org.apache.dubbo.common.utils.NetUtils.isInvalidLocalHost;
  * ReferenceConfig
  *
  * @export
+ *
  */
 public class ReferenceConfig<T> extends AbstractReferenceConfig {
 
@@ -185,6 +182,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     }
 
     private void init() {
+        logger.info("ReferenceConfig执行init()方法，先进行参数校验和设置默认值...");
         if (initialized) {
             return;
         }
@@ -202,8 +200,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             interfaceClass = GenericService.class;
         } else {
             try {
-                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
-                        .getContextClassLoader());
+                interfaceClass = Class.forName(interfaceName, true, Thread.currentThread().getContextClassLoader());
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
@@ -333,14 +330,21 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
 
         //attributes are stored by system context.
         StaticContext.getSystemContext().putAll(attributes);
+        logger.info("ReferenceConfig参数校验和设置默认值结束，map:" + map);
+        System.out.println();
+        logger.info("开始执行createProxy...");
         ref = createProxy(map);
+        logger.info("执行createProxy结束.ref的类型: " + ref.getClass().getSimpleName());
         ConsumerModel consumerModel = new ConsumerModel(getUniqueServiceName(), this, ref, interfaceClass.getMethods());
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes", "deprecation"})
     private T createProxy(Map<String, String> map) {
+        logger.info("createProxy() 先根据map组装consumer端的临时URL...");
         URL tmpUrl = new URL("temp", "localhost", 0, map);
+        logger.info("createProxy() 根据map组装consumer端的临时URL结束：" + tmpUrl);
+
         final boolean isJvmRefer;
         if (isInjvm() == null) {
             if (url != null && url.length() > 0) { // if a url is specified, don't do local reference
@@ -352,7 +356,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         } else {
             isJvmRefer = isInjvm();
         }
-
+        logger.info("isJvmReference:" + isJvmRefer);
         if (isJvmRefer) {
             URL url = new URL(Constants.LOCAL_PROTOCOL, NetUtils.LOCALHOST, 0, interfaceClass.getName()).addParameters(map);
             invoker = refprotocol.refer(interfaceClass, url);
@@ -375,7 +379,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                         }
                     }
                 }
-            } else { // assemble URL from register center's configuration
+            } else {
+                // assemble URL from register center's configuration
                 List<URL> us = loadRegistries(false);
                 if (us != null && !us.isEmpty()) {
                     for (URL u : us) {
@@ -392,7 +397,23 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
 
             if (urls.size() == 1) {
+                logger.info("=================================");
+                logger.info("=================================");
+                logger.info("=================================");
+                logger.info("=================================");
+                logger.info("=================================");
+
+                logger.info("ReferenceConfig-----refer开始通过SPI机制加载refprotocol，默认为RegistryProtocol，则调用RegistryProtocol的refer方法进行服务应用。");
+                logger.info("通过SPI获取的refprotocol类型是：" + refprotocol.getClass().getSimpleName() + " obj: " + refprotocol);
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
+                logger.info("ReferenceConfig-----refprotocol （RegistryProtocol） refer()结束！");
+
+                logger.info("=================================");
+                logger.info("=================================");
+                logger.info("=================================");
+                logger.info("=================================");
+
+
             } else {
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
@@ -427,8 +448,17 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (logger.isInfoEnabled()) {
             logger.info("Refer dubbo service " + interfaceClass.getName() + " from url " + invoker.getUrl());
         }
-        // create service proxy
-        return (T) proxyFactory.getProxy(invoker);
+
+        System.out.println();
+        System.out.println();
+        logger.info("----对Invoker进行代理开始");
+        T t = (T) proxyFactory.getProxy(invoker);
+        logger.info("----对Invoker进行代理结束");
+
+        System.out.println();
+        System.out.println();
+        logger.info("-----整个createProxy结束");
+        return t;
     }
 
     private void checkDefault() {

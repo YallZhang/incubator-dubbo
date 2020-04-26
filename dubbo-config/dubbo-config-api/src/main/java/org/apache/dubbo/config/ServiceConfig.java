@@ -78,8 +78,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     private static final Map<String, Integer> RANDOM_PORT_MAP = new HashMap<String, Integer>();
 
     private static final ScheduledExecutorService delayExportExecutor = Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory("DubboServiceDelayExporter", true));
-    private final List<URL> urls = new ArrayList<URL>();
-    private final List<Exporter<?>> exporters = new ArrayList<Exporter<?>>();
+    private final List<URL> urls = new ArrayList<>();
+    private final List<Exporter<?>> exporters = new ArrayList<>();
     // interface type
     private String interfaceName;
     private Class<?> interfaceClass;
@@ -441,13 +441,14 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             if (revision != null && revision.length() > 0) {
                 map.put("revision", revision);
             }
-
-            String[] methods = Wrapper.getWrapper(interfaceClass).getMethodNames();
+            //todo:关键点 Wrapper会自己通过String拼接的方式生成一个包装类
+            Wrapper wrapper = Wrapper.getWrapper(interfaceClass);
+            String[] methods = wrapper.getMethodNames();
             if (methods.length == 0) {
                 logger.warn("NO method found in service interface " + interfaceClass.getName());
                 map.put(Constants.METHODS_KEY, Constants.ANY_VALUE);
             } else {
-                map.put(Constants.METHODS_KEY, StringUtils.join(new HashSet<String>(Arrays.asList(methods)), ","));
+                map.put(Constants.METHODS_KEY, StringUtils.join(new HashSet<>(Arrays.asList(methods)), ","));
             }
         }
         if (!ConfigUtils.isEmpty(token)) {
@@ -471,10 +472,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         Integer port = this.findConfigedPorts(protocolConfig, name, map);
         URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
 
-        if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
-                .hasExtension(url.getProtocol())) {
-            url = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
-                    .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
+        if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class).hasExtension(url.getProtocol())) {
+            url = ExtensionLoader
+                    .getExtensionLoader(ConfiguratorFactory.class)
+                    .getExtension(url.getProtocol())
+                    .getConfigurator(url)
+                    .configure(url);
         }
 
         String scope = url.getParameter(Constants.SCOPE_KEY);
@@ -490,7 +493,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 if (logger.isInfoEnabled()) {
                     logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
                 }
-                if (registryURLs != null && !registryURLs.isEmpty()) {
+                if (registryURLs != null && registryURLs.size() > 0) {
                     for (URL registryURL : registryURLs) {
                         url = url.addParameterIfAbsent(Constants.DYNAMIC_KEY, registryURL.getParameter(Constants.DYNAMIC_KEY));
                         URL monitorUrl = loadMonitor(registryURL);
@@ -506,11 +509,15 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                         if (StringUtils.isNotEmpty(proxy)) {
                             registryURL = registryURL.addParameter(Constants.PROXY_KEY, proxy);
                         }
-
+                        //todo:关键点 由proxyFactory创建一个Invoker，proxyFactory来自于由SPI ExtensionLoader加载为ServiceConfig类的静态属性
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+
+                        //todo:关键点 再将invoker包装成一个wrapperInvoker,它也是Invoker接口的实现类
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
 
+                        //todo:关键点 由protocol真正执行export，protocol也是由ExtensionLoader静态加载的
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
+
                         exporters.add(exporter);
                     }
                 } else {
@@ -528,6 +535,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void exportLocal(URL url) {
         if (!Constants.LOCAL_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
+            System.out.println();
+            System.out.println();
+            System.out.println("-----------------进行本地暴露");
             URL local = URL.valueOf(url.toFullString())
                     .setProtocol(Constants.LOCAL_PROTOCOL)
                     .setHost(LOCALHOST)
@@ -537,6 +547,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                     proxyFactory.getInvoker(ref, (Class) interfaceClass, local));
             exporters.add(exporter);
             logger.info("Export dubbo service " + interfaceClass.getName() + " to local registry");
+            System.out.println("-----------------进行本地暴露 结束");
+            System.out.println();
+            System.out.println();
         }
     }
 

@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ *
  * ReferenceFactoryBean
  */
 public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean, ApplicationContextAware, InitializingBean, DisposableBean {
@@ -61,7 +62,11 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
 
     @Override
     public Object getObject() {
-        return get();
+        System.out.println("===============开始执行这个：ReferenceBean默认是执行懒汉模式，真正get的时候才去进行服务引用.");
+        System.out.println("===============ReferenceBean还可以通过配置使用afterPropertiesSet()在加载bean时就进行服务引用");
+        Object obj = get();
+        System.out.println("===============执行服务引用结束！");
+        return obj;
     }
 
     @Override
@@ -78,6 +83,7 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
     @Override
     @SuppressWarnings({"unchecked"})
     public void afterPropertiesSet() throws Exception {
+        System.out.println("-------------ReferenceBean执行afterPropertiesSet...");
         if (getConsumer() == null) {
             Map<String, ConsumerConfig> consumerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ConsumerConfig.class, false, false);
             if (consumerConfigMap != null && consumerConfigMap.size() > 0) {
@@ -173,6 +179,7 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
         if (b != null && b) {
             getObject();
         }
+        System.out.println("-------------ReferenceBean执行afterPropertiesSet...结束");
     }
 
     @Override

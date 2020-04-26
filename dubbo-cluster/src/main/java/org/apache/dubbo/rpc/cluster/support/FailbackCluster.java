@@ -31,6 +31,8 @@ public class FailbackCluster implements Cluster {
 
     @Override
     public <T> Invoker<T> join(Directory<T> directory) throws RpcException {
+        System.out.println("+++++++++++++++执行FailbackCluster的join()方法，并返回Invoker");
+
         return new FailbackClusterInvoker<T>(directory);
     }
 

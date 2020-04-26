@@ -41,6 +41,7 @@ import java.util.Set;
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Failover">Failover</a>
  *
+ *
  */
 public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -53,6 +54,7 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Result doInvoke(Invocation invocation, final List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+        logger.info("执行FailoverClusterInvoker的doInvoker()方法.......");
         List<Invoker<T>> copyinvokers = invokers;
         checkInvokers(copyinvokers, invocation);
         String methodName = RpcUtils.getMethodName(invocation);
@@ -73,11 +75,14 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 // check again
                 checkInvokers(copyinvokers, invocation);
             }
+
             Invoker<T> invoker = select(loadbalance, invocation, copyinvokers, invoked);
+
             invoked.add(invoker);
             RpcContext.getContext().setInvokers((List) invoked);
             try {
                 Result result = invoker.invoke(invocation);
+
                 if (le != null && logger.isWarnEnabled()) {
                     logger.warn("Although retry the method " + methodName
                             + " in the service " + getInterface().getName()

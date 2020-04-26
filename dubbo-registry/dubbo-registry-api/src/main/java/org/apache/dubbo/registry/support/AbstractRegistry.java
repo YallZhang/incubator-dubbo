@@ -61,6 +61,7 @@ public abstract class AbstractRegistry implements Registry {
     private static final String URL_SPLIT = "\\s+";
     // Log output
     protected final Logger logger = LoggerFactory.getLogger(getClass());
+    protected final Logger loggerCur = LoggerFactory.getLogger(AbstractRegistry.class);
     // Local disk cache, where the special key value.registies records the list of registry centers, and the others are the list of notified service providers
     private final Properties properties = new Properties();
     // File cache timing writing
@@ -270,7 +271,7 @@ public abstract class AbstractRegistry implements Registry {
             throw new IllegalArgumentException("register url == null");
         }
         if (logger.isInfoEnabled()) {
-            logger.info("Register: " + url);
+            loggerCur.info("Register: " + url);
         }
         registered.add(url);
     }
@@ -281,7 +282,7 @@ public abstract class AbstractRegistry implements Registry {
             throw new IllegalArgumentException("unregister url == null");
         }
         if (logger.isInfoEnabled()) {
-            logger.info("Unregister: " + url);
+            loggerCur.info("Unregister:  " + url);
         }
         registered.remove(url);
     }
@@ -295,7 +296,7 @@ public abstract class AbstractRegistry implements Registry {
             throw new IllegalArgumentException("subscribe listener == null");
         }
         if (logger.isInfoEnabled()) {
-            logger.info("Subscribe: " + url);
+            logger.info(getClass().getSimpleName() + "Subscribe: " + url);
         }
         Set<NotifyListener> listeners = subscribed.get(url);
         if (listeners == null) {
@@ -374,6 +375,7 @@ public abstract class AbstractRegistry implements Registry {
     }
 
     protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+        logger.info("AbstractRegistry # ----notify()执行开始");
         if (url == null) {
             throw new IllegalArgumentException("notify url == null");
         }
@@ -386,9 +388,10 @@ public abstract class AbstractRegistry implements Registry {
             return;
         }
         if (logger.isInfoEnabled()) {
-            logger.info("Notify urls for subscribe url " + url + ", urls: " + urls);
+            logger.info("AbstractRegistry # ---Notify urls for subscribe url " + url + ", urls: " + urls);
         }
         Map<String, List<URL>> result = new HashMap<String, List<URL>>();
+
         for (URL u : urls) {
             if (UrlUtils.isMatch(url, u)) {
                 String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
@@ -403,18 +406,31 @@ public abstract class AbstractRegistry implements Registry {
         if (result.size() == 0) {
             return;
         }
+
         Map<String, List<URL>> categoryNotified = notified.get(url);
         if (categoryNotified == null) {
             notified.putIfAbsent(url, new ConcurrentHashMap<String, List<URL>>());
             categoryNotified = notified.get(url);
         }
+        System.out.println();
+        System.out.println();
+        logger.info("AbstractRegistry # notify() -> for result");
         for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
             String category = entry.getKey();
             List<URL> categoryList = entry.getValue();
             categoryNotified.put(category, categoryList);
             saveProperties(url);
-            listener.notify(categoryList);
+            if (category.equals("providers")) {
+                logger.info("【RegistryDirectory就是listener。listener.notify();  " + category + " 开始】");
+                listener.notify(categoryList);
+                logger.info("【RegistryDirectory就是listener。listener.notify();  " + category + " 结束】");
+            } else {
+                listener.notify(categoryList);
+            }
         }
+        logger.info("AbstractRegistry # notify() -> for result 结束");
+
+        logger.info("AbstractRegistry # ----notify()执行结束");
     }
 
     private void saveProperties(URL url) {
